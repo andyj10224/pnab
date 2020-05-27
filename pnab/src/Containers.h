@@ -178,7 +178,8 @@ namespace PNAB {
         */
         HelicalParameters() : h_twist{0}, h_rise{0}, inclination{0}, tip{0}, x_displacement{0}, y_displacement{0},
                               shift{0}, slide{0}, rise{0}, tilt{0}, roll{0}, twist{0},
-                              buckle{0}, propeller{0}, opening{0}, shear{0}, stretch{0}, stagger{0}, is_helical{true} {};
+                              buckle{0}, propeller{0}, opening{0}, shear{0}, stretch{0}, stagger{0}, h_twist_sum{0},
+                              h_rise_sum{0}, is_helical{true} {};
 
         //Helical parameters
         double     inclination,                         //!< @brief Inclination
@@ -198,21 +199,26 @@ namespace PNAB {
                    opening,                             //!< @brief Opening
                    shear,                               //!< @brief Shear
                    stretch,                             //!< @brief Stretch
-                   stagger;                             //!< @brief Stagger
+                   stagger,                             //!< @brief Stagger
+                   h_twist_sum,                         //!< @brief Cumulative sum of h_twists
+                   h_rise_sum;                          //!< @brief Cumulative sum of h_rise
         bool is_helical;                                //!< @brief Are the base parameters helical or step parameters
+        std::vector<OpenBabel::vector3> odv0;           //!< @brief The first origin and direction vectors for a nucleic acid base-pair (i.e. The global direction vectors)
+        std::vector<OpenBabel::vector3> odv;
+        std::vector<OpenBabel::vector3> cmbt;            //!< @brief Current mid-base-triad origin and direction vectors of the base pair
 
         /**
         * @brief A function to compute the helical parameters. This should be called when the the step parameters are provided.
         *
         * @sa is_helical
         * @sa StepParametersToReferenceFrame
-        * @sa ReferenceFrameToHelicalParameters 
+        * @sa ReferenceFrameToHelicalParameters
         */
         void computeHelicalParameters();
 
         /**
-        * @brief Get the global translation vector 
-        * 
+        * @brief Get the global translation vector
+        *
         * For the base step transformation, the HelicalParameters::x_displacement and HelicalParameters::y_displacement are used.
         * For the base-pair transformation, the HelicalParameters::shear and HelicalParameters::stretch are used.
         * The base pair parameters are divided by two and set to positive or negative values depending on which strand is being constructed.
@@ -254,13 +260,15 @@ namespace PNAB {
         * @sa rodrigues_formula
         */
 
+        OpenBabel::vector3 getTranslationVector(bool is_base_pair=false, bool is_second_strand=false);
+
         // Lu, X. J., El Hassan, M. A., & Hunter, C. A. (1997). Structure and conformation of helical nucleic acids:
         // rebuilding program (SCHNArP). Journal of molecular biology, 273(3), 681-691.
         OpenBabel::matrix3x3 getGlobalRotationMatrix(bool is_base_pair=false, bool is_second_strand=false);
 
         /**
         * @brief Get the step rotation matrix
-        * 
+        *
         * For the base step transformation, the HelicalParameters::twist is used.
         * For the base-pair transformation, the HelicalParameters::opening is used.
         * The base pair parameters are divided by two and set to positive or negative values depending on which strand is being constructed.
@@ -272,6 +280,8 @@ namespace PNAB {
         * @returns The step rotation matrix
         */
         OpenBabel::matrix3x3 getStepRotationMatrix(unsigned n = 0, bool is_base_pair=false, bool is_second_strand=false);
+
+        OpenBabel::matrix3x3 getRotationMatrix(bool is_base_pair=false, bool is_second_strand=false);
 
     private:
         /**
@@ -298,9 +308,9 @@ namespace PNAB {
         * @return The origin and direction vectors
         *
         * @sa ReferenceFrameToHelicalParameters
-        */ 
+        */
         std::vector<OpenBabel::vector3> StepParametersToReferenceFrame();
- 
+
         /**
         * @brief Computes the helical parameters given the origin and direction vectors of the second base
         *
@@ -315,7 +325,7 @@ namespace PNAB {
         * @param z2 The z direction vector for the second base pair
         *
         * @sa StepParametersToReferenceFrame
-        */  
+        */
         void ReferenceFrameToHelicalParameters(OpenBabel::vector3 origin2, OpenBabel::vector3 x2, OpenBabel::vector3 y2, OpenBabel::vector3 z2);
 
     };

@@ -134,10 +134,10 @@ void Chain::fillConformerEnergyData(double *xyz, PNAB::ConformerData &conf_data,
     unsigned n = 0;
     for (auto i: build_strand_) {
         if(i)
-            n += chain_length_; 
+            n += chain_length_;
     }
 
-    // Get bond energy. We set the constraint to ignore all bonds except the 
+    // Get bond energy. We set the constraint to ignore all bonds except the
     // one bond between the first and second nucleotides in the first strand
     // The other bonds will have the same energy
     pFF_->Setup(*current_mol, constraintsBond_);
@@ -152,7 +152,7 @@ void Chain::fillConformerEnergyData(double *xyz, PNAB::ConformerData &conf_data,
         return;
     }
 
-    // Get angle energy. We compute the energy only between the first and 
+    // Get angle energy. We compute the energy only between the first and
     // second nucleotides in the first strand. The other angles will have the same energy
 
     // We use energy groups here
@@ -514,7 +514,7 @@ void Chain::setCoordsForChain(double *xyz, double *conf, PNAB::HelicalParameters
     //// Reflection that we can apply if we want the same orientation as that of 3DNA
     //matrix3x3 change_sign2 = {{-1, 0, 0},{0, 1, 0}, {0, 0, -1}};
 
-    // Get the global rotation and translations
+    // Initialize global rotation and translations
     auto g_rot = hp.getGlobalRotationMatrix(false, false);
     auto g_trans = hp.getGlobalTranslationVec(false, false);
     unsigned xyzI = 0, local_offset = 0, deleted_atom_index = 0;
@@ -525,13 +525,24 @@ void Chain::setCoordsForChain(double *xyz, double *conf, PNAB::HelicalParameters
             xyzI += 3 * v_chain_[i].NumAtoms();
     }
 
+    hp.odv0 = {vector3(0, 0, 0), vector3(1, 0, 0), vector3(0, 1, 0), vector3(0, 0, 1)};
+    hp.cmbt = {vector3(0, 0, 0), vector3(1, 0, 0), vector3(0, 1, 0), vector3(0, 0, 1)};
+    hp.h_twist_sum = 0;
+    hp.h_rise_sum = 0;
+
     // Setup the coordinates for each nucleotide
     for (unsigned i = 0; i < chain_length_; ++i) {
         auto n = num_bu_atoms[i];
         auto r = bb_start_index[i];
-        // Get the step translation and rotation 
+        // Get the step translation and rotation
         auto s_trans = hp.getStepTranslationVec(i, false, false);
-        auto s_rot   = hp.getStepRotationMatrix(i, false, false);
+        auto s_rot = hp.getStepRotationMatrix(i, false, false);
+
+        hp.h_twist_sum += hp.h_twist;
+        hp.h_rise_sum += hp.h_rise;
+
+        auto new_trans = hp.getTranslationVector(false, false);
+        auto new_rot = hp.getRotationMatrix(false, false);
 
         // Set the coordinates for the nucleobases
         double *base_coords = base_coords_vec[i];
@@ -542,15 +553,24 @@ void Chain::setCoordsForChain(double *xyz, double *conf, PNAB::HelicalParameters
             if (!strand_orientation_[chain_index])
                 v3 *= change_sign;
 
-            v3 *= hp.getStepRotationMatrix(1, true, (bool) chain_index);
-            v3 *= hp.getGlobalRotationMatrix(true, (bool) chain_index);
-            v3 += hp.getStepTranslationVec(1, true, (bool) chain_index);
-            v3 += hp.getGlobalTranslationVec(true, (bool) chain_index);
-            
-            v3 *= g_rot;
-            v3 += g_trans;
-            v3 *= s_rot;
-            v3 += s_trans;
+            v3 -= hp.cmbt[0];
+            v3 *= hp.getRotationMatrix(true, (bool) chain_index);
+            v3 += hp.getTranslationVector(true, (bool) chain_index);
+
+            //v3 *= hp.getStepRotationMatrix(1, true, (bool) chain_index);
+            //v3 *= hp.getGlobalRotationMatrix(true, (bool) chain_index);
+            //v3 += hp.getStepTranslationVec(1, true, (bool) chain_index);
+            //v3 += hp.getGlobalTranslationVec(true, (bool) chain_index);
+
+            v3 -= hp.odv0[0];
+            v3 *= new_rot;
+            v3 += new_trans;
+
+            //v3 *= new_rot;
+            //v3 *= g_rot;
+            //v3 += g_trans;
+            //v3 *= s_rot;
+            //v3 += s_trans;
 
             if (hexad_)
                 v3 *= z_rot;
@@ -572,15 +592,23 @@ void Chain::setCoordsForChain(double *xyz, double *conf, PNAB::HelicalParameters
                 if (!strand_orientation_[chain_index])
                      v3 *= change_sign;
 
-                v3 *= hp.getStepRotationMatrix(1, true, (bool) chain_index);
-                v3 *= hp.getGlobalRotationMatrix(true, (bool) chain_index);
-                v3 += hp.getStepTranslationVec(1, true, (bool) chain_index);
-                v3 += hp.getGlobalTranslationVec(true, (bool) chain_index);
- 
-                v3 *= g_rot;
-                v3 += g_trans;
-                v3 *= s_rot;
-                v3 += s_trans;
+                //v3 *= hp.getStepRotationMatrix(1, true, (bool) chain_index);
+                //v3 *= hp.getGlobalRotationMatrix(true, (bool) chain_index);
+                //v3 += hp.getStepTranslationVec(1, true, (bool) chain_index);
+                //v3 += hp.getGlobalTranslationVec(true, (bool) chain_index);
+
+                //v3 *= g_rot;
+                //v3 += g_trans;
+                //v3 *= s_rot;
+                //v3 += s_trans;
+
+                v3 -= hp.cmbt[0];
+                v3 *= hp.getRotationMatrix(true, (bool) chain_index);
+                v3 += hp.getTranslationVector(true, (bool) chain_index);
+
+                v3 -= hp.odv0[0];
+                v3 *= new_rot;
+                v3 += new_trans;
 
                 if (hexad_)
                     v3 *= z_rot;
@@ -596,6 +624,19 @@ void Chain::setCoordsForChain(double *xyz, double *conf, PNAB::HelicalParameters
             monomer_index++;
         }
         local_offset += n;
+
+        //hp.cmbt[0] = new_trans;
+        //hp.cmbt[1] = new_rot * vector3(1, 0, 0);
+        //hp.cmbt[2] = new_rot * vector3(0, 1, 0);
+        //hp.cmbt[3] = new_rot * vector3(0, 0, 1);
+
+        //hp.x_displacement += 0.1;
+        //hp.y_displacement += 0.1;
+        hp.h_rise += 0.1;
+        //hp.inclination += 1;
+        //hp.tip += 10;
+        //hp.h_twist += 1;
+
     }
 
 }

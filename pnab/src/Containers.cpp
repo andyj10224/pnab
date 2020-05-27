@@ -18,6 +18,19 @@ void HelicalParameters::computeHelicalParameters() {
     return;
 }
 
+/*
+
+void HelicalParameters::computeStepParameters() {
+    if (is_helical) {
+        vector<vector3> ref_frame = HelicalParametersToReferenceFrame();
+        ReferenceFrameToStepParameters(ref_frame[0], ref_frame[1], ref_frame[2], ref_frame[3]);
+    }
+
+    return;
+}
+
+*/
+
 vector3 HelicalParameters::getGlobalTranslationVec(bool is_base_pair, bool is_second_strand) {
     if (!is_base_pair)
         return vector3(x_displacement, y_displacement, 0);
@@ -36,6 +49,55 @@ vector3 HelicalParameters::getStepTranslationVec(unsigned n, bool is_base_pair, 
         return vector3(0, 0, -0.5*stagger);
 }
 
+vector3 HelicalParameters::getTranslationVector(bool is_base_pair, bool is_second_strand) {
+    double angle1, angle2, angle3;
+    double trans1, trans2, trans3;
+    if (!is_base_pair) {
+        angle1 = inclination * DEG_TO_RAD; //x
+        angle2 = tip * DEG_TO_RAD; //y
+        angle3 = h_twist_sum * DEG_TO_RAD; //z
+
+        trans1 = x_displacement;
+        trans2 = y_displacement;
+        trans3 = h_rise_sum;
+
+        double lambda = sqrt(angle1*angle1 + angle2*angle2);
+
+        matrix3x3 rot1 = rodrigues_formula(odv0[3], angle3);
+
+        vector3 y_new = rot1 * odv0[2];
+        vector3 x_new = rot1 * odv0[1];
+
+        vector3 ti_axis = (angle2/lambda) * y_new + (angle1/lambda) * x_new;
+
+        matrix3x3 rot2 = rodrigues_formula(ti_axis, lambda);
+
+        vector3 x_trans = trans1 * (rot1 * odv0[1]);
+        vector3 y_trans = trans2 * (rot1 * odv0[2]);
+        vector3 z_trans = trans3 * (odv0[3]);
+
+        return x_trans + y_trans + z_trans;
+
+    }
+    else {
+        if (!is_second_strand) {
+
+            trans1 = shear * 0.5;
+            trans2 = stretch * 0.5;
+            trans3 = stagger * 0.5;
+        }
+
+        else {
+
+            trans1 = -shear * 0.5;
+            trans2 = -stretch * 0.5;
+            trans3 = -stagger * 0.5;
+        }
+
+        return (trans1 * cmbt[1]) + (trans2 * cmbt[2]) + (trans3 * cmbt[3]);
+    }
+}
+
 
 matrix3x3 HelicalParameters::getGlobalRotationMatrix(bool is_base_pair, bool is_second_strand) {
     double angle1, angle2;
@@ -47,7 +109,7 @@ matrix3x3 HelicalParameters::getGlobalRotationMatrix(bool is_base_pair, bool is_
         angle1 = -0.5 * buckle * DEG_TO_RAD, angle2 = -0.5 * propeller * DEG_TO_RAD;
 
     double Lambda = sqrt(angle1*angle1 + angle2*angle2);
-    
+
     vector3 axis;
     if (Lambda != 0)
         axis = vector3(angle1/Lambda, angle2/Lambda, 0);
@@ -74,6 +136,87 @@ matrix3x3 HelicalParameters::getStepRotationMatrix(unsigned n, bool is_base_pair
 
     return r_mat;
 };
+
+matrix3x3 HelicalParameters::getRotationMatrix(bool is_base_pair, bool is_second_strand) {
+    double angle1, angle2, angle3;
+    if (!is_base_pair) {
+        angle1 = inclination * DEG_TO_RAD; //x
+        angle2 = tip * DEG_TO_RAD; //y
+        angle3 = h_twist_sum * DEG_TO_RAD; //z
+
+        double lambda = sqrt(angle1*angle1 + angle2*angle2);
+
+        matrix3x3 rot1 = rodrigues_formula(odv0[3], angle3);
+
+        vector3 y_new = rot1 * odv0[2];
+        vector3 x_new = rot1 * odv0[1];
+
+        vector3 ti_axis = (angle2/lambda) * y_new + (angle1/lambda) * x_new;
+
+        matrix3x3 rot2 = rodrigues_formula(ti_axis, lambda);
+
+        return rot2 * rot1;
+
+        /*
+
+        double phidp;
+
+        if (angle2 != 0) {
+            phidp = atan(angle1/angle2);
+        }
+
+        else {
+            if (angle1 > 0) {
+                phidp = M_PI/2.0;
+            }
+
+            else {
+                phidp = -M_PI/2.0;
+            }
+        }
+
+        if (cos(phidp) * angle2 < 0 || sin(phidp) * angle1 < 0) {
+            lambda *= -1;
+        }
+
+        */
+
+        //return rodrigues_formula(odv0[3], 0.5 * angle3 - phidp) * rodrigues_formula(odv0[2], lambda) * rodrigues_formula(odv0[3], 0.5 * angle3 + phidp);
+
+    }
+
+    else {
+        angle1 = buckle * DEG_TO_RAD; //x
+        angle2 = propeller * DEG_TO_RAD; //y
+        angle3 = opening * DEG_TO_RAD; //z
+
+        double gamma = sqrt(angle1*angle1 + angle3*angle3);
+
+        double phip;
+
+        if (angle1 != 0) {
+            phip = atan(angle3/angle1);
+        }
+
+        else {
+            if (angle3 > 0) {
+                phip = M_PI/2.0;
+            }
+
+            else {
+                phip = -M_PI/2.0;
+            }
+        }
+
+        if (!is_second_strand) {
+            return rodrigues_formula(cmbt[2], -phip) * rodrigues_formula(cmbt[1], 0.5 * gamma) * rodrigues_formula(cmbt[2], phip + 0.5 * angle2);
+        }
+
+        else {
+            return rodrigues_formula(cmbt[2], -phip) * rodrigues_formula(cmbt[1], -0.5 * gamma) * rodrigues_formula(cmbt[2], phip - 0.5 * angle2);
+        }
+    }
+}
 
 matrix3x3 HelicalParameters::rodrigues_formula(vector3 axis_vector, double theta) {
 
@@ -285,7 +428,7 @@ Backbone::Backbone(std::string file_path, std::array<unsigned, 2> interconnects,
     }
     if (!conv.Read(&backbone)) {
         throw std::runtime_error("Backbone: There was an error reading file for backbone: " + file_path);
-        
+
     }
 
     // Basic validation of the indices
@@ -395,7 +538,7 @@ void Base::validate() {
 
 Bases::Bases(std::vector<Base> input_bases) {
 
-    // Loop through the bases and create a vector of them 
+    // Loop through the bases and create a vector of them
     for (unsigned i = 0; i < input_bases.size(); ++i) {
         string file_path = input_bases[i].file_path;
 
