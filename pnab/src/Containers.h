@@ -204,6 +204,7 @@ namespace PNAB {
                    h_rise_sum;                          //!< @brief Cumulative sum of h_rise
         bool is_helical;                                //!< @brief Are the base parameters helical or step parameters
         std::vector<OpenBabel::vector3> odv0;           //!< @brief The first origin and direction vectors for a nucleic acid base-pair (i.e. The global direction vectors)
+        std::vector<OpenBabel::vector3> odv_prev;
         std::vector<OpenBabel::vector3> odv;
         std::vector<OpenBabel::vector3> cmbt;            //!< @brief Current mid-base-triad origin and direction vectors of the base pair
 
@@ -215,6 +216,8 @@ namespace PNAB {
         * @sa ReferenceFrameToHelicalParameters
         */
         void computeHelicalParameters();
+
+        void computeStepParameters();
 
         /**
         * @brief Get the global translation vector
@@ -327,6 +330,10 @@ namespace PNAB {
         * @sa StepParametersToReferenceFrame
         */
         void ReferenceFrameToHelicalParameters(OpenBabel::vector3 origin2, OpenBabel::vector3 x2, OpenBabel::vector3 y2, OpenBabel::vector3 z2);
+
+        std::vector<OpenBabel::vector3> HelicalParametersToReferenceFrame();
+
+        void ReferenceFrameToStepParameters(std::vector<OpenBabel::vector3> oldReferenceFrame, std::vector<OpenBabel::vector3> referenceFrame);
 
     };
 

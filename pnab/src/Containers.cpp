@@ -18,18 +18,14 @@ void HelicalParameters::computeHelicalParameters() {
     return;
 }
 
-/*
-
 void HelicalParameters::computeStepParameters() {
     if (is_helical) {
         vector<vector3> ref_frame = HelicalParametersToReferenceFrame();
-        ReferenceFrameToStepParameters(ref_frame[0], ref_frame[1], ref_frame[2], ref_frame[3]);
+        ReferenceFrameToStepParameters(odv_prev, ref_frame);
     }
 
     return;
 }
-
-*/
 
 vector3 HelicalParameters::getGlobalTranslationVec(bool is_base_pair, bool is_second_strand) {
     if (!is_base_pair)
@@ -50,33 +46,15 @@ vector3 HelicalParameters::getStepTranslationVec(unsigned n, bool is_base_pair, 
 }
 
 vector3 HelicalParameters::getTranslationVector(bool is_base_pair, bool is_second_strand) {
-    double angle1, angle2, angle3;
     double trans1, trans2, trans3;
     if (!is_base_pair) {
-        angle1 = inclination * DEG_TO_RAD; //x
-        angle2 = tip * DEG_TO_RAD; //y
-        angle3 = h_twist_sum * DEG_TO_RAD; //z
-
         trans1 = x_displacement;
         trans2 = y_displacement;
-        trans3 = h_rise_sum;
+        trans3 = h_rise;
 
-        double lambda = sqrt(angle1*angle1 + angle2*angle2);
+        matrix3x3 rot_mat = getRotationMatrix(is_base_pair, is_second_strand);
 
-        matrix3x3 rot1 = rodrigues_formula(odv0[3], angle3);
-
-        vector3 y_new = rot1 * odv0[2];
-        vector3 x_new = rot1 * odv0[1];
-
-        vector3 ti_axis = (angle2/lambda) * y_new + (angle1/lambda) * x_new;
-
-        matrix3x3 rot2 = rodrigues_formula(ti_axis, lambda);
-
-        vector3 x_trans = trans1 * (rot1 * odv0[1]);
-        vector3 y_trans = trans2 * (rot1 * odv0[2]);
-        vector3 z_trans = trans3 * (odv0[3]);
-
-        return x_trans + y_trans + z_trans;
+        return odv_prev[0] + rot_mat * vector3(trans1, trans2, trans3);
 
     }
     else {
@@ -140,33 +118,36 @@ matrix3x3 HelicalParameters::getStepRotationMatrix(unsigned n, bool is_base_pair
 matrix3x3 HelicalParameters::getRotationMatrix(bool is_base_pair, bool is_second_strand) {
     double angle1, angle2, angle3;
     if (!is_base_pair) {
-        angle1 = inclination * DEG_TO_RAD; //x
-        angle2 = tip * DEG_TO_RAD; //y
-        angle3 = h_twist_sum * DEG_TO_RAD; //z
+
+        double angle1 = inclination * DEG_TO_RAD; //x
+        double angle2 = tip * DEG_TO_RAD; //y
+        double angle3 = h_twist * DEG_TO_RAD; //z
 
         double lambda = sqrt(angle1*angle1 + angle2*angle2);
 
-        matrix3x3 rot1 = rodrigues_formula(odv0[3], angle3);
-
-        vector3 y_new = rot1 * odv0[2];
-        vector3 x_new = rot1 * odv0[1];
-
-        vector3 ti_axis = (angle2/lambda) * y_new + (angle1/lambda) * x_new;
-
-        matrix3x3 rot2 = rodrigues_formula(ti_axis, lambda);
-
-        return rot2 * rot1;
-
         /*
+        vector3 y_new = odv0[2];
+        vector3 x_new = odv0[1];
+        vector3 ti_axis;
+
+
+        if (lambda != 0) {
+            ti_axis = (angle2/lambda) * y_new + (angle1/lambda) * x_new;
+        }
+
+        else {
+            ti_axis = odv0[2];
+        }
+        */
 
         double phidp;
 
-        if (angle2 != 0) {
+        if (fabs(angle2) > 0.0000001) {
             phidp = atan(angle1/angle2);
         }
 
         else {
-            if (angle1 > 0) {
+            if (tilt > 0) {
                 phidp = M_PI/2.0;
             }
 
@@ -175,13 +156,52 @@ matrix3x3 HelicalParameters::getRotationMatrix(bool is_base_pair, bool is_second
             }
         }
 
-        if (cos(phidp) * angle2 < 0 || sin(phidp) * angle1 < 0) {
-            lambda *= -1;
-        }
+        /*
+
+        matrix3x3 rot1 = rodrigues_formula(odv0[3], angle3);
+        matrix3x3 rot2 = rodrigues_formula(ti_axis, lambda);
+        matrix3x3 rot3 = rodrigues_formula(ti_axis, -lambda);
+
+        matrix3x3 rot_matrix = rot3 * rot1 * rot2;
 
         */
 
-        //return rodrigues_formula(odv0[3], 0.5 * angle3 - phidp) * rodrigues_formula(odv0[2], lambda) * rodrigues_formula(odv0[3], 0.5 * angle3 + phidp);
+        matrix3x3 rot1 = rodrigues_formula(odv_prev[3], -phidp);
+        matrix3x3 rot2 = rodrigues_formula(odv_prev[2], -lambda);
+        matrix3x3 rot3 = rodrigues_formula(odv_prev[3], angle3);
+        matrix3x3 rot4 = rodrigues_formula(odv_prev[2], lambda);
+        matrix3x3 rot5 = rodrigues_formula(odv_prev[3], phidp);
+
+        matrix3x3 rot_matrix = rot1 * rot2 * rot3 * rot4 * rot5;
+
+        return rot_matrix * (matrix3x3(odv_prev[1], odv_prev[2], odv_prev[3]).transpose());
+
+        /*
+
+        angle1 = tilt * DEG_TO_RAD;
+        angle2 = roll * DEG_TO_RAD;
+        angle3 = twist * DEG_TO_RAD;
+
+        double gamma = sqrt(angle1*angle1 + angle2*angle2);
+        double phi;
+
+        if (fabs(angle2) > 0.0000001) {
+            phi = atan(angle1/angle2);
+        }
+
+        else {
+            if (tilt > 0) {
+                phi = M_PI/2.0;
+            }
+
+            else {
+                phi = -M_PI/2.0;
+            }
+        }
+
+        return rodrigues_formula(odv_prev[3], angle3 * 0.5 - phi) * rodrigues_formula(odv_prev[2], gamma) * rodrigues_formula(odv_prev[3], angle3 * 0.5 + phi) * (matrix3x3(odv_prev[1], odv_prev[2], odv_prev[3]).transpose());
+
+        */
 
     }
 
@@ -390,6 +410,101 @@ void HelicalParameters::ReferenceFrameToHelicalParameters(vector3 origin2, vecto
     y_displacement = -1.0 * (temp.x() + temp.y() + temp.z());
 
     return;
+}
+
+vector<vector3> HelicalParameters::HelicalParametersToReferenceFrame() {
+
+    double angle1 = inclination * DEG_TO_RAD; //x
+    double angle2 = tip * DEG_TO_RAD; //y
+    double angle3 = h_twist_sum * DEG_TO_RAD; //z
+
+    double trans1 = x_displacement;
+    double trans2 = y_displacement;
+    double trans3 = h_rise_sum;
+
+    double lambda = sqrt(angle1*angle1 + angle2*angle2);
+
+    vector3 y_new = odv0[2];
+    vector3 x_new = odv0[1];
+    vector3 ti_axis;
+
+    if (lambda != 0) {
+        ti_axis = (angle2/lambda) * y_new + (angle1/lambda) * x_new;
+    }
+
+    else {
+        ti_axis = odv0[2];
+    }
+
+    matrix3x3 rot1 = rodrigues_formula(odv0[3], angle3);
+    matrix3x3 rot2 = rodrigues_formula(ti_axis, lambda);
+    matrix3x3 rot3 = rodrigues_formula(ti_axis, -lambda);
+
+    matrix3x3 rot_matrix = rot3 * rot1 * rot2;
+    vector3 trans_vector = trans1 * (rot1 * odv0[1]) + trans2 * (rot1 * odv0[2]) + trans3 * (odv0[3]);
+
+    return {trans_vector, rot_matrix.GetColumn(0), rot_matrix.GetColumn(1), rot_matrix.GetColumn(2)};
+
+}
+
+void HelicalParameters::ReferenceFrameToStepParameters(vector<vector3> oldReferenceFrame, vector<vector3> referenceFrame) {
+
+    double roll_tilt = acos(OpenBabel::dot(oldReferenceFrame[3], referenceFrame[3]));
+
+    vector3 rt_axis = OpenBabel::cross(oldReferenceFrame[3], referenceFrame[3]);
+
+    if (fabs(rt_axis.length()) > 0.000001) {
+        rt_axis /= rt_axis.length();
+    }
+
+    else {
+        rt_axis = oldReferenceFrame[2];
+    }
+
+    matrix3x3 Ti = matrix3x3(oldReferenceFrame[1], oldReferenceFrame[2], oldReferenceFrame[3]).transpose();
+    matrix3x3 Tiplus1 = matrix3x3(referenceFrame[1], referenceFrame[2], referenceFrame[3]).transpose();
+
+    matrix3x3 Ti_p = rodrigues_formula(rt_axis, roll_tilt * 0.5) * Ti;
+    matrix3x3 Tiplus1_p = rodrigues_formula(rt_axis, -roll_tilt * 0.5) * Tiplus1;
+
+    matrix3x3 Tmst = 0.5 * matrix3x3(Ti_p.GetRow(0) + Tiplus1_p.GetRow(0), Ti_p.GetRow(1) + Tiplus1_p.GetRow(1), Ti_p.GetRow(2) + Tiplus1_p.GetRow(2));
+    vector3 rmst = (oldReferenceFrame[0] + referenceFrame[0]) * 0.5;
+
+    twist = acos(OpenBabel::dot(Ti_p.GetColumn(1), Tiplus1_p.GetColumn(1)));
+
+    double twist_tester = OpenBabel::dot(OpenBabel::cross(Ti_p.GetColumn(1), Tiplus1_p.GetColumn(1)), Tmst.GetColumn(2));
+
+    if (fabs(twist_tester) >= 0) {
+        twist = fabs(twist);
+    }
+
+    else {
+        twist = -fabs(twist);
+    }
+
+    twist /= DEG_TO_RAD;
+
+    double phi = acos(OpenBabel::dot(rt_axis, Tmst.GetColumn(1)));
+
+    double phi_tester = OpenBabel::dot(OpenBabel::cross(rt_axis, Tmst.GetColumn(1)), Tmst.GetColumn(2));
+
+    if (fabs(phi_tester) >= 0) {
+        phi = fabs(phi);
+    }
+
+    else {
+        phi = -fabs(phi);
+    }
+
+    roll = roll_tilt * cos(phi) / DEG_TO_RAD;
+    tilt = roll_tilt * sin(phi) / DEG_TO_RAD;
+
+    vector3 t_vector = Tmst.transpose() * (referenceFrame[0] - oldReferenceFrame[0]);
+
+    //x, y, z, respectively
+    shift = t_vector[0];
+    slide = t_vector[1];
+    rise = t_vector[2];
 }
 
 void Backbone::deleteVectorAtom() {

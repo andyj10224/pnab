@@ -526,9 +526,28 @@ void Chain::setCoordsForChain(double *xyz, double *conf, PNAB::HelicalParameters
     }
 
     hp.odv0 = {vector3(0, 0, 0), vector3(1, 0, 0), vector3(0, 1, 0), vector3(0, 0, 1)};
+    hp.odv = {vector3(0, 0, 0), vector3(1, 0, 0), vector3(0, 1, 0), vector3(0, 0, 1)};
+    hp.odv_prev = {vector3(0, 0, 0), vector3(1, 0, 0), vector3(0, 1, 0), vector3(0, 0, 1)};
     hp.cmbt = {vector3(0, 0, 0), vector3(1, 0, 0), vector3(0, 1, 0), vector3(0, 0, 1)};
     hp.h_twist_sum = 0;
     hp.h_rise_sum = 0;
+
+    vector3 new_trans = vector3(0, 0, 0);
+    matrix3x3 new_rot = matrix3x3(vector3(1, 0, 0), vector3(0, 1, 0), vector3(0, 0, 1));
+
+    //hp.x_displacement = 0;
+    //hp.y_displacement = 0;
+    //hp.h_rise = 0;
+    //hp.inclination = 0;
+    //hp.tip = 0;
+    //hp.h_twist = 0;
+
+    //hp.shift = 0;
+    //hp.slide = 0;
+    //hp.rise = 0;
+    //hp.tilt = 0.00;
+    //hp.roll = 0.00;
+    //hp.twist = 0.00;
 
     // Setup the coordinates for each nucleotide
     for (unsigned i = 0; i < chain_length_; ++i) {
@@ -538,11 +557,32 @@ void Chain::setCoordsForChain(double *xyz, double *conf, PNAB::HelicalParameters
         auto s_trans = hp.getStepTranslationVec(i, false, false);
         auto s_rot = hp.getStepRotationMatrix(i, false, false);
 
+        /*
+        if (i == 1) {
+            hp.shift = 0;
+            hp.slide = 0;
+            hp.rise = 0;
+            hp.tilt = 0.00;
+            hp.roll = 9.32;
+            hp.twist = 31.68;
+        }
+        */
+
+        /*
+        if (i == 1) {
+            hp.inclination = 16.62;
+            hp.tip = 7.56;
+            hp.h_twist = 32.99;
+        }
+        */
+
         hp.h_twist_sum += hp.h_twist;
         hp.h_rise_sum += hp.h_rise;
 
-        auto new_trans = hp.getTranslationVector(false, false);
-        auto new_rot = hp.getRotationMatrix(false, false);
+        hp.computeStepParameters();
+
+        new_trans = hp.getTranslationVector(false, false);
+        new_rot = hp.getRotationMatrix(false, false);
 
         // Set the coordinates for the nucleobases
         double *base_coords = base_coords_vec[i];
@@ -592,6 +632,7 @@ void Chain::setCoordsForChain(double *xyz, double *conf, PNAB::HelicalParameters
                 if (!strand_orientation_[chain_index])
                      v3 *= change_sign;
 
+
                 //v3 *= hp.getStepRotationMatrix(1, true, (bool) chain_index);
                 //v3 *= hp.getGlobalRotationMatrix(true, (bool) chain_index);
                 //v3 += hp.getStepTranslationVec(1, true, (bool) chain_index);
@@ -625,17 +666,24 @@ void Chain::setCoordsForChain(double *xyz, double *conf, PNAB::HelicalParameters
         }
         local_offset += n;
 
-        //hp.cmbt[0] = new_trans;
-        //hp.cmbt[1] = new_rot * vector3(1, 0, 0);
-        //hp.cmbt[2] = new_rot * vector3(0, 1, 0);
-        //hp.cmbt[3] = new_rot * vector3(0, 0, 1);
+        //hp.odv[0] += new_trans;
+        //hp.odv[1] *= new_rot;
+        //hp.odv[2] *= new_rot;
+        //hp.odv[3] = new_rot * hp.odv0[3];
 
-        //hp.x_displacement += 0.1;
-        //hp.y_displacement += 0.1;
-        hp.h_rise += 0.1;
-        //hp.inclination += 1;
-        //hp.tip += 10;
-        //hp.h_twist += 1;
+        //hp.x_displacement += 0.2;
+        //hp.y_displacement += 0.2;
+        //hp.h_rise += 0.2;
+        hp.inclination += 1;
+        hp.tip += 1;
+        hp.h_twist += 1;
+
+        hp.odv_prev[0] = new_trans + vector3(0, 0, 0);
+        hp.odv_prev[1] = new_rot.GetColumn(0);
+        hp.odv_prev[2] = new_rot.GetColumn(1);
+        hp.odv_prev[3] = new_rot.GetColumn(2);
+
+        //hp.tilt += 2;
 
     }
 
