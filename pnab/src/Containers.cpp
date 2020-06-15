@@ -45,16 +45,50 @@ vector3 HelicalParameters::getStepTranslationVec(unsigned n, bool is_base_pair, 
         return vector3(0, 0, -0.5*stagger);
 }
 
-vector3 HelicalParameters::getTranslationVector(bool is_base_pair, bool is_second_strand) {
+vector3 HelicalParameters::getTranslationVector(bool is_base_pair, bool is_second_strand, double theta) {
     double trans1, trans2, trans3;
     if (!is_base_pair) {
         trans1 = x_displacement;
         trans2 = y_displacement;
         trans3 = h_rise;
 
-        matrix3x3 rot_mat = getRotationMatrix(is_base_pair, is_second_strand);
+        double angle1 = inclination * DEG_TO_RAD; //x
+        double angle2 = tip * DEG_TO_RAD; //y
+        double angle3 = h_twist * DEG_TO_RAD; //z
 
-        return odv_prev[0] + rot_mat * vector3(trans1, trans2, trans3);
+        double lambda = sqrt(angle1*angle1 + angle2*angle2);
+
+        double phidp;
+
+        if (fabs(angle2) > 0.0000001) {
+            phidp = atan(angle1/angle2);
+        }
+
+        else {
+            if (tilt > 0) {
+                phidp = M_PI/2.0;
+            }
+
+            else {
+                phidp = -M_PI/2.0;
+            }
+        }
+
+        if (angle2 * cos(phidp) < 0 || angle1 * sin(phidp) < 0) {
+            lambda *= -1;
+        }
+
+        matrix3x3 for_prev = matrix3x3(odv_prev[1], odv_prev[2], odv_prev[3]).transpose();
+
+        matrix3x3 rot1 = rodrigues_formula(odv_prev[3], -phidp);
+        matrix3x3 rot2 = rodrigues_formula(odv_prev[2], -lambda);
+        matrix3x3 rot3 = rodrigues_formula(odv_prev[3], phidp);
+        matrix3x3 rot4 = rodrigues_formula(odv_prev[3], angle3);
+
+        matrix3x3 R_1h = rot1 * rot2 * rot3 * for_prev;
+        matrix3x3 R_2h = rot1 * rot2 * rot3 * rot4 * for_prev;
+
+        return odv_prev[0] + (R_2h.GetColumn(0) - R_1h.GetColumn(0)) * trans1 + (R_2h.GetColumn(1) - R_1h.GetColumn(1)) * trans2 + R_1h.GetColumn(2) * trans3;
 
     }
     else {
@@ -154,6 +188,10 @@ matrix3x3 HelicalParameters::getRotationMatrix(bool is_base_pair, bool is_second
             else {
                 phidp = -M_PI/2.0;
             }
+        }
+
+        if (angle2 * cos(phidp) < 0 || angle1 * sin(phidp) < 0) {
+            lambda *= -1;
         }
 
         /*

@@ -263,7 +263,7 @@ namespace PNAB {
         * @sa rodrigues_formula
         */
 
-        OpenBabel::vector3 getTranslationVector(bool is_base_pair=false, bool is_second_strand=false);
+        OpenBabel::vector3 getTranslationVector(bool is_base_pair=false, bool is_second_strand=false, double theta=0.0);
 
         // Lu, X. J., El Hassan, M. A., & Hunter, C. A. (1997). Structure and conformation of helical nucleic acids:
         // rebuilding program (SCHNArP). Journal of molecular biology, 273(3), 681-691.

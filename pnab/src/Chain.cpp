@@ -579,9 +579,11 @@ void Chain::setCoordsForChain(double *xyz, double *conf, PNAB::HelicalParameters
         hp.h_twist_sum += hp.h_twist;
         hp.h_rise_sum += hp.h_rise;
 
-        hp.computeStepParameters();
+        //hp.computeStepParameters();
 
-        new_trans = hp.getTranslationVector(false, false);
+        double theta = -M_PI + (i * M_PI/8);
+
+        new_trans = hp.getTranslationVector(false, false, theta);
         new_rot = hp.getRotationMatrix(false, false);
 
         // Set the coordinates for the nucleobases
@@ -671,9 +673,9 @@ void Chain::setCoordsForChain(double *xyz, double *conf, PNAB::HelicalParameters
         //hp.odv[2] *= new_rot;
         //hp.odv[3] = new_rot * hp.odv0[3];
 
-        //hp.x_displacement += 0.2;
-        //hp.y_displacement += 0.2;
-        //hp.h_rise += 0.2;
+        hp.x_displacement += 0.2;
+        hp.y_displacement += 0.2;
+        hp.h_rise += 0.2;
         hp.inclination += 1;
         hp.tip += 1;
         hp.h_twist += 1;
